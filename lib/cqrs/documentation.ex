@@ -14,8 +14,7 @@ defmodule Cqrs.Documentation do
 
             values =
               possible_values
-              |> Enum.map(&"`#{&1}`")
-              |> Enum.join(" | ")
+              |> Enum.map_join(&"`#{&1}`", " | ")
 
             "* `#{name}`: `:enum`.#{description}Possible values: #{values}. Defaults to `#{inspect(default)}`."
 
@@ -23,11 +22,7 @@ defmodule Cqrs.Documentation do
             default = Documentation.option_default(opts)
             description = Documentation.option_description(opts)
 
-            hint =
-              cond do
-                is_binary(hint) -> hint
-                true -> inspect(hint)
-              end
+            hint = if is_binary(hint), do: hint, else: inspect(hint)
 
             "* `#{name}` (#{hint}) - #{description}Defaults to `#{inspect(default)}`"
         end)
