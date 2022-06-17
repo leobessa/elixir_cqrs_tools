@@ -1,3 +1,4 @@
+# credo:disable-for-this-file
 defmodule Cqrs.Command do
   alias Cqrs.{Command, CommandError, Documentation, DomainEvent, Guards, Metadata, Options, Input}
 
@@ -39,9 +40,9 @@ defmodule Cqrs.Command do
 
   ### Creation
 
-      iex> {:error, errors} = CreateUser.new()
+      iex> {:error, %{errors: errors}} = CreateUser.new()
       ...> errors
-      %{email: [\"can't be blank\"], name: [\"can't be blank\"]}
+      [name: {"can't be blank", [validation: :required]}, email: {"can't be blank", [validation: :required]}]
 
       iex> {:ok, %CreateUser{email: email, name: name, id: id}} = CreateUser.new(email: "chris@example.com", name: "chris")
       ...> %{email: email, name: name, id: id}
@@ -52,11 +53,11 @@ defmodule Cqrs.Command do
 
   ### Dispatching
 
-      iex> {:error, {:invalid_command, errors}} =
+      iex> {:error, {:invalid_command, %{errors: errors}}} =
       ...> CreateUser.new(name: "chris", email: "wrong")
       ...> |> CreateUser.dispatch()
       ...> errors
-      %{email: ["has invalid format"]}
+      [email: {"has invalid format", [validation: :format]}]
 
       iex> CreateUser.new(name: "chris", email: "chris@example.com")
       ...> |> CreateUser.dispatch()
@@ -264,7 +265,30 @@ defmodule Cqrs.Command do
         Ecto.Schema.field(:created_at, :utc_datetime)
         Ecto.Schema.field(:discarded_fields, :map, virtual: true)
 
+        ecto_schema_field_opts = [
+          :default,
+          :source,
+          :autogenerate,
+          :read_after_writes,
+          :virtual,
+          :primary_key,
+          :load_in_query,
+          :redact,
+          :foreign_key,
+          :on_replace,
+          :defaults,
+          :type,
+          :where,
+          :references,
+          :skip_default_validation,
+          :values
+        ]
+
         Enum.map(@schema_fields, fn
+          {name, type, opts} ->
+            {name, type, opts |> Keyword.take(ecto_schema_field_opts)}
+        end)
+        |> Enum.each(fn
           {name, {:array, :enum}, opts} ->
             Ecto.Schema.field(name, {:array, Ecto.Enum}, opts)
 
@@ -278,7 +302,7 @@ defmodule Cqrs.Command do
             Ecto.Schema.field(name, type, opts)
         end)
 
-        Enum.map(@schema_value_objects, fn
+        Enum.each(@schema_value_objects, fn
           {name, {:array, type}, _opts} ->
             Ecto.Schema.embeds_many(name, type)
 
@@ -381,16 +405,20 @@ defmodule Cqrs.Command do
           |> Input.normalize_input(__MODULE__)
 
         fields = Enum.map(@schema_fields, &elem(&1, 0))
-        associations = Enum.map(@schema_value_objects, &elem(&1, 0))
+        embeds = Enum.map(@schema_value_objects, &elem(&1, 0))
 
         changeset =
           %__MODULE__{}
           |> CS.cast(attrs, fields)
+          |> then(fn changeset ->
+            @schema_value_objects
+            |> Enum.reduce(
+              changeset,
+              &CS.cast_embed(&2, elem(&1, 0), required: Keyword.get(elem(&1, 2), :required, false))
+            )
+          end)
           |> __MODULE__.handle_validate(opts)
-
-        associations
-        |> Enum.reduce(changeset, &CS.cast_assoc(&2, &1))
-        |> CS.validate_required(@required_fields)
+          |> CS.validate_required(Enum.reject(@required_fields, &(&1 in embeds)))
       end
     end
   end
@@ -568,8 +596,8 @@ defmodule Cqrs.Command do
       |> Changeset.cast(attrs, fields -- embeds)
 
     embeds
-    |> Enum.reduce(changeset, &Changeset.cast_embed(&2, &1))
-    |> Changeset.validate_required(required_fields)
+    |> Enum.reduce(changeset, &Changeset.cast_embed(&2, &1, required: &1 in required_fields))
+    |> Changeset.validate_required(Enum.reject(required_fields, &(&1 in embeds)))
     |> mod.handle_validate(opts)
   end
 
@@ -609,7 +637,7 @@ defmodule Cqrs.Command do
         |> mod.after_create(opts)
 
       {:error, changeset} ->
-        {:error, format_errors(changeset)}
+        {:error, changeset}
     end
   end
 
@@ -623,14 +651,6 @@ defmodule Cqrs.Command do
   defp discarded_data(mod, attrs) do
     fields = mod.__schema__(:fields) |> Enum.map(&to_string/1)
     Map.drop(attrs, fields)
-  end
-
-  defp format_errors(changeset) do
-    Changeset.traverse_errors(changeset, fn {message, opts} ->
-      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
-        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
-      end)
-    end)
   end
 
   def __do_dispatch__(mod, %{__struct__: mod} = command, opts) do

@@ -1,3 +1,4 @@
+# credo:disable-for-this-file
 defmodule Cqrs.Query do
   alias Ecto.Changeset
 
@@ -80,7 +81,7 @@ defmodule Cqrs.Query do
   @callback handle_execute(query(), opts()) :: {:error, query()} | {:error, any()} | any()
   @callback handle_execute!(query(), opts()) :: any()
 
-  alias Cqrs.{Documentation, Query, QueryError, Metadata, Options, Input}
+  alias Cqrs.{Documentation, Input, Metadata, Options, Query, QueryError}
 
   defmacro __using__(opts \\ []) do
     require_all_filters = Keyword.get(opts, :require_all_filters, false)
@@ -177,7 +178,29 @@ defmodule Cqrs.Query do
 
       @primary_key false
       embedded_schema do
+        ecto_schema_field_opts = [
+          :default,
+          :source,
+          :autogenerate,
+          :read_after_writes,
+          :virtual,
+          :primary_key,
+          :load_in_query,
+          :redact,
+          :foreign_key,
+          :on_replace,
+          :defaults,
+          :type,
+          :where,
+          :references,
+          :skip_default_validation
+        ]
+
         Enum.map(@filters, fn
+          {name, type, opts} ->
+            {name, type, opts |> Keyword.take(ecto_schema_field_opts)}
+        end)
+        |> Enum.map(fn
           {name, {:array, :enum}, opts} ->
             Ecto.Schema.field(name, {:array, Ecto.Enum}, opts)
 
