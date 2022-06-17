@@ -25,7 +25,7 @@ defmodule Cqrs.ValueObject do
   """
   @callback after_validate(struct()) :: struct()
 
-  alias Cqrs.{Documentation, ValueObject, ValueObjectError, Input}
+  alias Cqrs.{Documentation, Input, ValueObject, ValueObjectError}
 
   defmacro __using__(opts \\ []) do
     require_all_fields = Keyword.get(opts, :require_all_fields, true)
@@ -100,7 +100,30 @@ defmodule Cqrs.ValueObject do
 
       @primary_key false
       embedded_schema do
+        ecto_schema_field_opts = [
+          :default,
+          :source,
+          :autogenerate,
+          :read_after_writes,
+          :virtual,
+          :primary_key,
+          :load_in_query,
+          :redact,
+          :foreign_key,
+          :on_replace,
+          :defaults,
+          :type,
+          :where,
+          :references,
+          :skip_default_validation,
+          :values
+        ]
+
         Enum.map(@schema_fields, fn
+          {name, type, opts} ->
+            {name, type, opts |> Keyword.take(ecto_schema_field_opts)}
+        end)
+        |> Enum.each(fn
           {name, :enum, opts} ->
             Ecto.Schema.field(name, Ecto.Enum, opts)
 
