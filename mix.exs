@@ -39,8 +39,6 @@ defmodule CqrsTools.MixProject do
     [
       {:ecto, "~> 3.2"},
       {:jason, "~> 1.1", optional: true},
-      {:absinthe, "~> 1.4", optional: true},
-      {:absinthe_relay, "~> 1.4", optional: true},
       {:commanded, "~> 1.0", optional: true},
       {:ex_doc, "~> 0.24", only: :dev, runtime: false},
       {:elixir_uuid, "~> 1.6", override: true, hex: :uuid_utils, only: :test},
