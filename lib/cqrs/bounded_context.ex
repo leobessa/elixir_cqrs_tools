@@ -1,3 +1,4 @@
+# credo:disable-for-this-file
 defmodule Cqrs.BoundedContext do
   alias Cqrs.{BoundedContext, Guards, BoundedContext.DefaultOpts}
 
@@ -17,13 +18,13 @@ defmodule Cqrs.BoundedContext do
 
   ### Commands
 
-      iex> {:error, {:invalid_command, errors}} = Users.create_user(name: "chris", email: "wrong")
+      iex> {:error, {:invalid_command, %{errors: errors}}} = Users.create_user(name: "chris", email: "wrong")
       ...> errors
-      %{email: ["has invalid format"]}
+      [email: {"has invalid format", [validation: :format]}]
 
-      iex> {:error, {:invalid_command, errors}} =  Users.create_user2(name: "chris", email: "wrong")
+      iex> {:error, {:invalid_command, %{errors: errors}}} =  Users.create_user2(name: "chris", email: "wrong")
       ...> errors
-      %{email: ["has invalid format"]}
+      [email: {"has invalid format", [validation: :format]}]
 
       iex> Users.create_user(name: "chris", email: "chris@example.com")
       {:ok, :dispatched}
@@ -72,6 +73,9 @@ defmodule Cqrs.BoundedContext do
   * `create_user/0`
   * `create_user/1`
   * `create_user/2`
+  * `create_user_changeset/0`
+  * `create_user_changeset/1`
+  * `create_user_changeset/2`
 
   ## Options
 
@@ -105,9 +109,11 @@ defmodule Cqrs.BoundedContext do
       if length(required_fields) > 0 do
         def unquote(function_name)(attrs, opts \\ [])
         def unquote(:"#{function_name}!")(attrs, opts \\ [])
+        def unquote(:"#{function_name}_changeset")(attrs, opts \\ [])
       else
         def unquote(function_name)(attrs \\ [], opts \\ [])
         def unquote(:"#{function_name}!")(attrs \\ [], opts \\ [])
+        def unquote(:"#{function_name}_changeset")(attrs \\ [], opts \\ [])
       end
     end
   end
@@ -128,6 +134,14 @@ defmodule Cqrs.BoundedContext do
       def unquote(:"#{function_name}!")(attrs, opts) do
         opts = Keyword.merge(unquote(opts), Cqrs.Options.normalize(opts))
         BoundedContext.__dispatch_command__!(unquote(command_module), attrs, opts)
+      end
+
+      @doc """
+      #{unquote(command_module).__module_docs__()}
+      """
+      def unquote(:"#{function_name}_changeset")(attrs, opts) do
+        opts = Keyword.merge(unquote(opts), Cqrs.Options.normalize(opts))
+        BoundedContext.__changeset_command__(unquote(command_module), attrs, opts)
       end
     end
   end
@@ -256,6 +270,14 @@ defmodule Cqrs.BoundedContext do
     attrs
     |> module.new(opts)
     |> module.dispatch(opts)
+    |> __handle_result__(opts)
+  end
+
+  def __changeset_command__(module, attrs, opts) do
+    opts = DefaultOpts.set(opts)
+
+    attrs
+    |> module.changeset(opts)
     |> __handle_result__(opts)
   end
 
