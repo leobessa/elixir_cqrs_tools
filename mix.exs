@@ -12,14 +12,14 @@ defmodule CqrsTools.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       description: "A collection of handy Elixir macros for CQRS applications.",
-      source_url: "https://github.com/trbngr/elixir_cqrs_tools",
+      source_url: "https://github.com/leobessa/elixir_cqrs_tools",
       docs: [
         main: "Cqrs",
         source_ref: "v#{@version}"
       ],
       package: [
         licenses: ["MIT"],
-        links: %{"GitHub" => "https://github.com/trbngr/elixir_cqrs_tools"}
+        links: %{"GitHub" => "https://github.com/leobessa/elixir_cqrs_tools"}
       ]
     ]
   end

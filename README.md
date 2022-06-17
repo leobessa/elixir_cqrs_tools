@@ -1,6 +1,8 @@
 # CqrsTools
 
-A collection of handy Elixir macros for CQRS applications. 
+Forked from trbngr/elixir_cqrs_tools.
+
+A collection of handy Elixir macros for CQRS applications.
 
 This library was the stomping grounds for the set of libraries that live https://github.com/elixir-cqrs/.
 
